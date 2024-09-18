@@ -1,275 +1,268 @@
+/*----------------------------------------------------------------------------*/
+/*                                                                            */
+/*    Module:       main.cpp                                                  */
+/*    Author:       chris                                                     */
+/*    Created:      9/14/2024, 3:43:34 PM                                     */
+/*    Description:  V5 project                                                */
+/*                                                                            */
+/*----------------------------------------------------------------------------*/
 #include "vex.h"
-#include "usercontrol.hpp"
-#include "vexfield.h"
-#include "logo.h"
-#include "rlogo.h"
-#include "autofunctions.h"
-#include <cmath>
-#include <iomanip>
-#include "sensorcheck.h"
 
 using namespace vex;
-competition Competition;
 
-Drive chassis(
-//ZERO_TRACKER_NO_ODOM, ZERO_TRACKER_ODOM, TANK_ONE_ENCODER, TANK_ONE_ROTATION, TANK_TWO_ENCODER, TANK_TWO_ROTATION, HOLONOMIC_TWO_ENCODER, and HOLONOMIC_TWO_ROTATION
-ZERO_TRACKER_NO_ODOM,
+// A global instance of vex::brain used for printing to the V5 brain screen
+vex::brain       Brain;
 
-//Left Motors:
-motor_group(LF,LM,LB),
+// define your global instances of motors and other devices here
 
-//Right Motors:
-motor_group(RF,RM,RB),
+#pragma region VEXcode Generated Robot Configuration
+// Make sure all required headers are included.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <math.h>
+#include <string.h>
 
-//Inertial Port
-PORT7,
 
-//Wheel Diameter
-3.25,
+// START V5 MACROS
+#define waitUntil(condition)                                                   \
+  do {                                                                         \
+    wait(5, msec);                                                             \
+  } while (!(condition))
 
-//Gear ratio
-0.75,
+#define repeat(iterations)                                                     \
+  for (int iterator = 0; iterator < iterations; iterator++)
+// END V5 MACROS
 
-//Gyro scale
-352,
 
-/*---------------------------------------------------------------------------*/
-/*                                  PAUSE!                                   */
-/*---------------------------------------------------------------------------*/
+// Robot configuration code.
+motor leftMotorA = motor(PORT11, ratio6_1, true);
+motor leftMotorB = motor(PORT12, ratio6_1, true);
+motor leftMotorC = motor(PORT13, ratio6_1, true);
+motor leftMotorD = motor(PORT14, ratio6_1, true);
+motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC, leftMotorD);
+motor rightMotorA = motor(PORT17, ratio6_1, false);
+motor rightMotorB = motor(PORT18, ratio6_1, false);
+motor rightMotorC = motor(PORT19, ratio6_1, false);
+motor rightMotorD = motor(PORT20, ratio6_1, false);
+motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC, rightMotorD);
+inertial DrivetrainInertial = inertial(PORT10);
+smartdrive Drivetrain = smartdrive(LeftDriveSmart, RightDriveSmart, DrivetrainInertial, 299.24, 320, 40, mm, 0.8);
 
-//HOLO DT
+controller Controller1 = controller(primary);
+motor MotorGroup1MotorA = motor(PORT1, ratio36_1, false);
+motor MotorGroup1MotorB = motor(PORT2, ratio36_1, true);
+motor MotorGroup1MotorC = motor(PORT3, ratio36_1, true);
+motor_group MotorGroup1 = motor_group(MotorGroup1MotorA, MotorGroup1MotorB, MotorGroup1MotorC);
+motor MotorGroup2MotorA = motor(PORT9, ratio18_1, false);
+motor MotorGroup2MotorB = motor(PORT10, ratio18_1, false);
+motor_group MotorGroup2 = motor_group(MotorGroup2MotorA, MotorGroup2MotorB);
 
-//LF:      //RF:    
-PORT1,     -PORT2,
 
-//LB:      //RB: 
-PORT3,     -PORT4,
 
-//If you are using position tracking, this is the Forward Tracker port (the tracker which runs parallel to the direction of the chassis).
-//Rotation sensor: "PORT1"
-//Encoder: Triport A will be "1", 
-3,
+// generating and setting random seed
+void initializeRandomSeed(){
+  int systemTime = Brain.Timer.systemHighResolution();
+  double batteryCurrent = Brain.Battery.current();
+  double batteryVoltage = Brain.Battery.voltage(voltageUnits::mV);
 
-//Forward Tracker diameter
-2.75,
+  // Combine these values into a single integer
+  int seed = int(batteryVoltage + batteryCurrent * 100) + systemTime;
 
-//Forward Tracker center distance
--2,
-
-//Sideways Tracker Port
-1,
-
-//Sideways tracker diameter
--2.75,
-
-//Sideways tracker center distance
-5.5
-
-);
-
-int current_auton_selection = 0;
-bool auto_started = false;
-int autonState = 0; 
-
-void debug_menu(int selection){
-  // int inertialval;
-  bool debug_is_pressed = false;
-  while(1){
-    float inertialval = Inertial100.heading();
-    if(debug_is_pressed == false){
-      Brain.Screen.drawImageFromBuffer(vexfield, 50, 0, sizeof(vexfield));
-      Brain.Screen.drawImageFromBuffer(logo, 10, 0, sizeof(logo));
-      Brain.Screen.setPenWidth(4); 
-      Brain.Screen.setFont(monoL); 
-      Brain.Screen.drawLine(310,0,310,240); 
-      Brain.Screen.drawLine(310,70,480,70); 
-      Brain.Screen.setFillColor(black); 
-      Brain.Screen.setFont(mono40);
-      Brain.Screen.setFillColor(blue);
-      Brain.Screen.drawRectangle(310,70,170,210);
-      Brain.Screen.printAt(345,140,"Debug");
-      Brain.Screen.setFont(monoM);
-      Brain.Screen.printAt(345,180,"Inertial:");
-      Brain.Screen.printAt(345,195,"%f",inertialval);
-    }
-    if(Brain.Screen.pressing()){
-      Brain.Screen.clearScreen();
-      waitUntil(Brain.Screen.pressing() == false);
-        debug_is_pressed =!debug_is_pressed;
-    }
-    if(debug_is_pressed == true){
-      Brain.Screen.setFillColor(clearerr); 
-      Brain.Screen.setFont(mono30);
-      Brain.Screen.setPenColor(blue);
-      Brain.Screen.printAt(155, 40, "Debug Menu:");
-      Brain.Screen.setFont(mono20);
-      Brain.Screen.setPenColor(white);
-      Brain.Screen.printAt(20, 90, "Heading:%f",std::floor(Inertial100.heading()));
-      Brain.Screen.printAt(20, 140, "Battery:%f",std::floor(Brain.Battery.capacity()));
-      Brain.Screen.printAt(20, 190, "DT Avg Temp:%f",std::floor((LF.temperature(percent)+LM.temperature(percent)+LB.temperature(percent)+RF.temperature(percent)+RM.temperature(percent)+RB.temperature(percent))/6));
-      Brain.Screen.printAt(270, 90, "Hang Temp:%f",std::floor(cataMotor.temperature(percent)));
-      Brain.Screen.printAt(270, 140, "Intake Temp:%f",std::floor(intakeMotor.temperature(percent)));
-      Brain.Screen.printAt(270, 190, "Kicker Temp:%f",std::floor(kicker.temperature(percent)));
-    }
-    if(limitselect.pressing()){
-      waitUntil(limitselect.pressing());
-      break;
-    }
-    wait(20,msec);
-  }
+  // Set the seed
+  srand(seed);
 }
 
-void pre_auton(void) {
-  vexcodeInit();
-  default_constants();
-  printf("Battery: %f \n",std::round(Brain.Battery.capacity()));
-  intakeMotor.setStopping(hold);
-  back_wings.set(false);
-  back_wings2.set(false);
-  hangrot.resetPosition(); 
-  hangrot.setPosition(0, rotationUnits::rev); 
-  Brain.Screen.clearScreen();
-  while(1) {
-    switch(autonState) {
-      case 0:
-        Brain.Screen.setPenWidth(4);
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "AWP");
-        debug_menu(0);
-        break; 
-      case 1:
-        Brain.Screen.setPenWidth(4);
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "Safe Six");
-        debug_menu(1);
-        break; 
-      case 2:
-        Brain.Screen.setPenWidth(4);
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "Steal AWP");
-        debug_menu(2);
-        break; 
-      case 3:
-        Brain.Screen.setPenWidth(4);
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "Sixball");
-        debug_menu(3);
-        break; 
-      case 4:
-        Brain.Screen.setPenWidth(4); 
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "Safe Five");
-        debug_menu(4);
-        break; 
-      case 5:
-        Brain.Screen.setPenWidth(4); 
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "Skills");
-        debug_menu(5);
-        break;
-      default:
-        Brain.Screen.setPenWidth(4); 
-        Brain.Screen.setFont(monoL);
-        Brain.Screen.setFillColor(black); 
-        Brain.Screen.printAt(350, 43, "AWP");
-        debug_menu(0);
-        break;
-    }
-    if(limitselect.pressing()){
-      while(limitselect.pressing()) {}
-      Brain.Screen.clearScreen();
-      autonState++; 
-    }
-    if(autonState>5) autonState = 0; 
+bool vexcode_initial_drivetrain_calibration_completed = false;
+void calibrateDrivetrain() {
+  wait(200, msec);
+  Brain.Screen.print("Calibrating");
+  Brain.Screen.newLine();
+  Brain.Screen.print("Inertial");
+  DrivetrainInertial.calibrate();
+  while (DrivetrainInertial.isCalibrating()) {
+    wait(25, msec);
   }
+  vexcode_initial_drivetrain_calibration_completed = true;
+  // Clears the screen and returns the cursor to row 1, column 1.
+  Brain.Screen.clearScreen();
+  Brain.Screen.setCursor(1, 1);
+}
+
+void vexcodeInit() {
+
+  // Calibrate the Drivetrain
+  calibrateDrivetrain();
+
+  //Initializing random seed.
+  initializeRandomSeed(); 
+}
+
+
+// Helper to make playing sounds from the V5 in VEXcode easier and
+// keeps the code cleaner by making it clear what is happening.
+void playVexcodeSound(const char *soundName) {
+  printf("VEXPlaySound:%s\n", soundName);
+  wait(5, msec);
+}
+
+
+
+// define variable for remote controller enable/disable
+bool RemoteControlCodeEnabled = true;
+// define variables used for controlling motors based on controller inputs
+bool Controller1LeftShoulderControlMotorsStopped = true;
+bool Controller1RightShoulderControlMotorsStopped = true;
+bool DrivetrainLNeedsToBeStopped_Controller1 = true;
+bool DrivetrainRNeedsToBeStopped_Controller1 = true;
+
+// define a task that will handle monitoring inputs from Controller1
+int rc_auto_loop_function_Controller1() {
+  // process the controller input every 20 milliseconds
+  // update the motors based on the input values
+  while(true) {
+    if(RemoteControlCodeEnabled) {
+      // stop the motors if the brain is calibrating
+      if (DrivetrainInertial.isCalibrating()) {
+        LeftDriveSmart.stop();
+        RightDriveSmart.stop();
+        while (DrivetrainInertial.isCalibrating()) {
+          wait(25, msec);
+        }
+      }
+      
+      // calculate the drivetrain motor velocities from the controller joystick axies
+      // left = Axis3 + Axis1
+      // right = Axis3 - Axis1
+      int drivetrainLeftSideSpeed = Controller1.Axis3.position() + Controller1.Axis1.position();
+      int drivetrainRightSideSpeed = Controller1.Axis3.position() - Controller1.Axis1.position();
+      
+      // check if the value is inside of the deadband range
+      if (drivetrainLeftSideSpeed < 5 && drivetrainLeftSideSpeed > -5) {
+        // check if the left motor has already been stopped
+        if (DrivetrainLNeedsToBeStopped_Controller1) {
+          // stop the left drive motor
+          LeftDriveSmart.stop();
+          // tell the code that the left motor has been stopped
+          DrivetrainLNeedsToBeStopped_Controller1 = false;
+        }
+      } else {
+        // reset the toggle so that the deadband code knows to stop the left motor nexttime the input is in the deadband range
+        DrivetrainLNeedsToBeStopped_Controller1 = true;
+      }
+      // check if the value is inside of the deadband range
+      if (drivetrainRightSideSpeed < 5 && drivetrainRightSideSpeed > -5) {
+        // check if the right motor has already been stopped
+        if (DrivetrainRNeedsToBeStopped_Controller1) {
+          // stop the right drive motor
+          RightDriveSmart.stop();
+          // tell the code that the right motor has been stopped
+          DrivetrainRNeedsToBeStopped_Controller1 = false;
+        }
+      } else {
+        // reset the toggle so that the deadband code knows to stop the right motor next time the input is in the deadband range
+        DrivetrainRNeedsToBeStopped_Controller1 = true;
+      }
+      
+      // only tell the left drive motor to spin if the values are not in the deadband range
+      if (DrivetrainLNeedsToBeStopped_Controller1) {
+        LeftDriveSmart.setVelocity(drivetrainLeftSideSpeed, percent);
+        LeftDriveSmart.spin(forward);
+      }
+      // only tell the right drive motor to spin if the values are not in the deadband range
+      if (DrivetrainRNeedsToBeStopped_Controller1) {
+        RightDriveSmart.setVelocity(drivetrainRightSideSpeed, percent);
+        RightDriveSmart.spin(forward);
+      }
+      // check the ButtonL1/ButtonL2 status to control MotorGroup1
+      if (Controller1.ButtonL1.pressing()) {
+        MotorGroup1.spin(forward);
+        Controller1LeftShoulderControlMotorsStopped = false;
+      } else if (Controller1.ButtonL2.pressing()) {
+        MotorGroup1.spin(reverse);
+        Controller1LeftShoulderControlMotorsStopped = false;
+      } else if (!Controller1LeftShoulderControlMotorsStopped) {
+        MotorGroup1.stop();
+        // set the toggle so that we don't constantly tell the motor to stop when the buttons are released
+        Controller1LeftShoulderControlMotorsStopped = true;
+      }
+      // check the ButtonR1/ButtonR2 status to control MotorGroup2
+      if (Controller1.ButtonR1.pressing()) {
+        MotorGroup2.spin(forward);
+        Controller1RightShoulderControlMotorsStopped = false;
+      } else if (Controller1.ButtonR2.pressing()) {
+        MotorGroup2.spin(reverse);
+        Controller1RightShoulderControlMotorsStopped = false;
+      } else if (!Controller1RightShoulderControlMotorsStopped) {
+        MotorGroup2.stop();
+        // set the toggle so that we don't constantly tell the motor to stop when the buttons are released
+        Controller1RightShoulderControlMotorsStopped = true;
+      }
+    }
+    // wait before repeating the process
+    wait(20, msec);
+  }
+  return 0;
+}
+
+task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
+
+#pragma endregion VEXcode Generated Robot Configuration
+
+// ----------------------------------------------------------------------------
+//                                                                            
+//    Project:                                               
+//    Author:
+//    Created:
+//    Configuration:        
+//                                                                            
+// ----------------------------------------------------------------------------
+
+// Include the V5 Library
+#include "vex.h"
+
+// Allows for easier use of the VEX Library
+using namespace vex;
+
+// Begin project code
+
+void preAutonomous(void) {
+  // actions to do when the program starts
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("pre auton code");
+  wait(1, seconds);
 }
 
 void autonomous(void) {
-  switch(autonState){  
-    case 0:
-      // testing();
-      // ramAWP2();
-      noramAWP2();
-      // Worlds_Skills();
-      // Worlds_Skills();
-      // sixball();
-      // Safesix();
-      // RushNoRamAWP();
-      // PID_Test();
-      // Worlds_Skills();
-      // sixdisrupt();
-      break;
-    case 1:
-    // noramAWP2();
-      Safesix();
-      break;
-    case 2:
-      // Safesix();
-      RushNoRamAWP();
-      break;  
-    case 3:
-      // RushNoRamAWP();
-      sixball();
-      break;
-    case 4:
-      // sixball();
-      fiveballtouch();
-      break;
-    case 5:
-      // fiveballtouch();
-      Worlds_Skills();
-      break;
-    default:
-      noramAWP2();
-      break;
-  }
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("autonomous code");
+  // place automonous code here
+  
 }
 
-void usercontrol(void) {
-  task Suck1task(UC_Intake);
-  task Launchtask(UC_Slapper);
-  task Releasetask(UC_frontwings);
-  task Ratchettask(pistonratchett);
-  task verhormac(horvert);
-  checkBattery();
-  checkMotor(intakeMotor);
-  checkMotor(LF);
-  checkMotor(LM);
-  checkMotor(LB);
-  checkMotor(RF);
-  checkMotor(RM);
-  checkMotor(RB);
-  while(1){
-    chassis.control_arcade();
-    if(Controller1.ButtonY.pressing() && autonState == 5){
-      chassis.drive_max_voltage = 11.2;
-      chassis.set_drive_exit_conditions(0.5, 20, 1000);
-      chassis.set_turn_exit_conditions(0.4, 20, 900);
-      back_wings.set(true);
-      wait(120,msec);
-      back_wings.set(false);
-      chassis.diff(-45, -80, 1700, 300);
-      chassis.set_heading(180);
-      chassis.drive_distance(10);
-      chassis.turn_to_angle(69.2);
-      chassis.drive_distance(-4);
-      back_wings2.set(true);
-    }
-    wait(20,msec);
+void userControl(void) {
+  Brain.Screen.clearScreen();
+  // place driver control in this while loop
+  while (true) {
+    wait(20, msec);
   }
 }
 
 int main() {
+  // Initializing Robot Configuration. DO NOT REMOVE!
+  vexcodeInit();
+  // create competition instance
+  competition Competition;
+
+  // Set up callbacks for autonomous and driver control periods.
   Competition.autonomous(autonomous);
-  Competition.drivercontrol(usercontrol);
-  pre_auton();
+  Competition.drivercontrol(userControl);
+
+  // Run the pre-autonomous function.
+  preAutonomous();
+
+  // Prevent main from exiting with an infinite loop.
   while (true) {
     wait(100, msec);
   }
-} 
+}
